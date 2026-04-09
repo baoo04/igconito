@@ -1,6 +1,6 @@
-# API Gateway (legacy folder)
+# API Gateway (Spring Cloud Gateway)
 
-> **Active gateway:** [`services/gateway-service`](../services/gateway-service) — Spring Cloud Gateway. `docker-compose.yml` builds that image; this folder is not used by Compose.
+> **Active gateway:** this folder (`gateway/`). `docker-compose.yml` builds this image.
 
 ## Overview
 
@@ -19,7 +19,7 @@ The API Gateway serves as the single entry point for all client requests. It rou
 
 | Component  | Choice             |
 |------------|--------------------|
-| Approach   | Spring Cloud Gateway (see `services/gateway-service`) |
+| Approach   | Spring Cloud Gateway |
 
 ## Routing Table
 

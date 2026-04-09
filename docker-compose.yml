@@ -99,7 +99,7 @@ services:
       - app-network
 
   gateway-service:
-    build: ./services/gateway-service
+    build: ./gateway
     ports:
       - "${GATEWAY_PORT:-8080}:8080"
     env_file:
