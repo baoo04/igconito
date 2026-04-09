@@ -1,0 +1,38 @@
+# ============================================
+# Delivery & Payment Service — OpenAPI 3.0 Specification
+# Docs: https://swagger.io/specification/
+# ============================================
+openapi: 3.0.3
+info:
+  title: Delivery & Payment Service API
+  description: |
+    API specification for the Delivery & Payment Service.
+    Replace with your actual description.
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:5003
+    description: Local development
+
+paths:
+  /health:
+    get:
+      summary: Health check
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+
+  # Define your endpoints here following the pattern above
+
+components:
+  schemas: {}
+    # Define your data models here

@@ -1,0 +1,141 @@
+# Docker Compose — Multi-container orchestration
+# Run: docker compose up --build
+# Docs: https://docs.docker.com/compose/
+
+services:
+  mysql:
+    image: mysql:8.4
+    ports:
+      # Workbench: localhost + MYSQL_HOST_PORT. Default 3306 — stop Windows MySQL80 first or set MYSQL_HOST_PORT=3307 in .env.
+      - "${MYSQL_HOST_PORT:-3306}:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootsecret}
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./scripts/mysql-init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
+  menu-service:
+    build: ./services/menu-service
+    ports:
+      - "${MENU_SERVICE_PORT:-5001}:5000"
+    env_file:
+      - .env
+    environment:
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_DATABASE: menu_service_db
+      # Luôn foodorder@'%' (mysql-init). Đừng dùng root cho JDBC giữa container — root thường chỉ localhost trong image MySQL.
+      MYSQL_USER: foodorder
+      MYSQL_PASSWORD: foodorder
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:5000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 90s
+    networks:
+      - app-network
+
+  order-service:
+    build: ./services/order-service
+    ports:
+      - "${ORDER_SERVICE_PORT:-5002}:5000"
+    env_file:
+      - .env
+    environment:
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_DATABASE: order_service_db
+      MYSQL_USER: foodorder
+      MYSQL_PASSWORD: foodorder
+      MENU_SERVICE_BASE_URL: http://menu-service:5000
+    depends_on:
+      mysql:
+        condition: service_healthy
+      menu-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:5000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 90s
+    networks:
+      - app-network
+
+  delivery-payment-service:
+    build: ./services/delivery-payment-service
+    ports:
+      - "${DELIVERY_PAYMENT_SERVICE_PORT:-5003}:5000"
+    env_file:
+      - .env
+    environment:
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_DATABASE: delivery_payment_service_db
+      MYSQL_USER: foodorder
+      MYSQL_PASSWORD: foodorder
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:5000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 90s
+    networks:
+      - app-network
+
+  gateway-service:
+    build: ./services/gateway-service
+    ports:
+      - "${GATEWAY_PORT:-8080}:8080"
+    env_file:
+      - .env
+    depends_on:
+      menu-service:
+        condition: service_healthy
+      order-service:
+        condition: service_healthy
+      delivery-payment-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 60s
+    networks:
+      - app-network
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_BASE: http://localhost:8080
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    depends_on:
+      gateway-service:
+        condition: service_healthy
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  mysql-data:

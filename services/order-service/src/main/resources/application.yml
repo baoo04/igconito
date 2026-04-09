@@ -1,0 +1,23 @@
+server:
+  port: ${SERVER_PORT:5000}
+
+spring:
+  application:
+    name: order-service
+  datasource:
+    url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:order_service_db}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&characterEncoding=utf8
+    username: ${MYSQL_USER:foodorder}
+    password: ${MYSQL_PASSWORD:foodorder}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+
+menu:
+  service:
+    base-url: ${MENU_SERVICE_BASE_URL:http://localhost:5001}
