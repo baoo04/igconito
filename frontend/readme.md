@@ -7,9 +7,9 @@ Static HTML/CSS/JS served by nginx. API calls target the **API Gateway** (never 
 | Cách chạy | Mặc định |
 |-----------|----------|
 | **Docker Compose** (`http://localhost:3000`) | Cùng origin: `http://localhost:3000/api` — nginx reverse proxy tới container `gateway:8080` (không CORS). |
-| Mở file `index.html` trực tiếp (`file://`) | `http://localhost:8080` (có thể chỉnh trong ô **API base** và **Lưu**). |
+| Mở file `index.html` trực tiếp (`file://`) | Mặc định `http://localhost:8080` (xem `getApiBase()` trong `js/api.js`). |
 
-Có thể ghi đè bất kỳ base nào trong ô cấu hình (lưu trong `localStorage`). Giá trị cũ `http://localhost:8080` được tự bỏ một lần để chuyển sang proxy `/api`.
+Có thể ghi đè base URL qua `localStorage` key `cinema_api_base` nếu cần (không còn ô cấu hình trên UI). Giá trị cũ `http://localhost:8080` lưu riêng cho Docker được tự xóa một lần khi chuyển sang proxy `/api`.
 
 ## Build
 
