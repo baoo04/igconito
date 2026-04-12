@@ -31,7 +31,7 @@ public class GlobalExceptionHandler {
     return ResponseEntity.status(HttpStatus.BAD_REQUEST)
         .body(
             ErrorResponse.builder()
-                .error("VALIDATION_ERROR")
+                .error("VALIDATION_ERROR_0100600191122")
                 .message(msg)
                 .status(400)
                 .build());
