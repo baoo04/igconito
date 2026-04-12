@@ -1,0 +1,55 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: api-gateway
+  threads:
+    virtual:
+      enabled: true
+  cloud:
+    gateway:
+      routes:
+        - id: seat-showtime-subpaths
+          uri: http://${SEAT_SERVICE_HOST:seat-availability-service}:5000
+          predicates:
+            - Path=/showtimes/*/seats,/showtimes/*/availability
+        - id: seat-holds
+          uri: http://${SEAT_SERVICE_HOST:seat-availability-service}:5000
+          predicates:
+            - Path=/holds/**
+        - id: ticket-booking-service
+          uri: http://${BOOKING_SERVICE_HOST:ticket-booking-service}:5000
+          predicates:
+            - Path=/bookings/**
+        - id: customer-service
+          uri: http://${CUSTOMER_SERVICE_HOST:customer-service}:5000
+          predicates:
+            - Path=/customers/**
+        - id: payment-service
+          uri: http://${PAYMENT_SERVICE_HOST:payment-service}:5000
+          predicates:
+            - Path=/payments/**
+        - id: notification-service
+          uri: http://${NOTIFICATION_SERVICE_HOST:notification-service}:5000
+          predicates:
+            - Path=/notifications/**
+        - id: movie-service
+          uri: http://${MOVIE_SERVICE_HOST:movie-service}:5000
+          predicates:
+            - Path=/movies/**,/cinemas/**,/showtimes/**
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowedOrigins: "*"
+            allowedMethods: "*"
+            allowedHeaders: "*"
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      enabled: true

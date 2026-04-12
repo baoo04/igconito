@@ -1,0 +1,37 @@
+openapi: 3.0.3
+info:
+  title: Ticket Booking Service API
+  version: 1.0.0
+servers:
+  - url: http://localhost:5005
+paths:
+  /health:
+    get:
+      summary: Health
+      responses: { '200': { description: OK } }
+  /bookings/checkout:
+    post:
+      summary: Checkout (orchestrated)
+      parameters:
+        - in: header
+          name: X-Idempotency-Key
+          required: false
+          schema: { type: string }
+      responses:
+        '201': { description: Created }
+        '400': { description: Bad request }
+        '402': { description: Payment declined }
+        '409': { description: Hold invalid }
+        '502': { description: Downstream error }
+  /bookings/{bookingId}:
+    get:
+      summary: Booking detail
+      responses: { '200': { description: OK }, '404': { description: Not found } }
+  /bookings/{bookingId}/tickets:
+    get:
+      summary: Tickets for booking
+      responses: { '200': { description: OK } }
+  /bookings/{bookingId}/cancel:
+    post:
+      summary: Cancel confirmed booking
+      responses: { '200': { description: OK }, '409': { description: Conflict } }

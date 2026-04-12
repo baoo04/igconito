@@ -1,0 +1,221 @@
+# Full cinema stack — run: docker compose up --build
+
+services:
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-root}
+      MYSQL_DATABASE: movie_db
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./scripts/init-databases.sql:/docker-entrypoint-initdb.d/init-databases.sql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$$MYSQL_ROOT_PASSWORD\" || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 8
+      start_period: 30s
+    networks:
+      - app-network
+
+  movie-service:
+    build: ./services/movie-service
+    ports:
+      - "${MOVIE_SERVICE_PORT:-5001}:5000"
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_NAME: movie_db
+      DB_USER: root
+      DB_PASSWORD: ${DB_PASSWORD:-root}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:5000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+    networks:
+      - app-network
+
+  seat-availability-service:
+    build: ./services/seat-availability-service
+    ports:
+      - "${SEAT_SERVICE_PORT:-5002}:5000"
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_NAME: seat_db
+      DB_USER: root
+      DB_PASSWORD: ${DB_PASSWORD:-root}
+      MOVIE_SERVICE_BASE_URL: http://movie-service:5000
+    depends_on:
+      mysql:
+        condition: service_healthy
+      movie-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:5000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 120s
+    networks:
+      - app-network
+
+  customer-service:
+    build: ./services/customer-service
+    ports:
+      - "${CUSTOMER_SERVICE_PORT:-5003}:5000"
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_NAME: customer_db
+      DB_USER: root
+      DB_PASSWORD: ${DB_PASSWORD:-root}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:5000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+    networks:
+      - app-network
+
+  payment-service:
+    build: ./services/payment-service
+    ports:
+      - "${PAYMENT_SERVICE_PORT:-5004}:5000"
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_NAME: payment_db
+      DB_USER: root
+      DB_PASSWORD: ${DB_PASSWORD:-root}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:5000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+    networks:
+      - app-network
+
+  notification-service:
+    build: ./services/notification-service
+    ports:
+      - "${NOTIFICATION_SERVICE_PORT:-5006}:5000"
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_NAME: notification_db
+      DB_USER: root
+      DB_PASSWORD: ${DB_PASSWORD:-root}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:5000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+    networks:
+      - app-network
+
+  ticket-booking-service:
+    build: ./services/ticket-booking-service
+    ports:
+      - "${BOOKING_SERVICE_PORT:-5005}:5000"
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_NAME: booking_db
+      DB_USER: root
+      DB_PASSWORD: ${DB_PASSWORD:-root}
+      SEAT_SERVICE_HOST: seat-availability-service
+      CUSTOMER_SERVICE_HOST: customer-service
+      PAYMENT_SERVICE_HOST: payment-service
+      NOTIFICATION_SERVICE_HOST: notification-service
+      MOVIE_SERVICE_HOST: movie-service
+    depends_on:
+      mysql:
+        condition: service_healthy
+      movie-service:
+        condition: service_healthy
+      seat-availability-service:
+        condition: service_healthy
+      customer-service:
+        condition: service_healthy
+      payment-service:
+        condition: service_healthy
+      notification-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:5000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 120s
+    networks:
+      - app-network
+
+  gateway:
+    build: ./gateway
+    ports:
+      - "${GATEWAY_PORT:-8080}:8080"
+    environment:
+      MOVIE_SERVICE_HOST: movie-service
+      SEAT_SERVICE_HOST: seat-availability-service
+      CUSTOMER_SERVICE_HOST: customer-service
+      PAYMENT_SERVICE_HOST: payment-service
+      NOTIFICATION_SERVICE_HOST: notification-service
+      BOOKING_SERVICE_HOST: ticket-booking-service
+    depends_on:
+      movie-service:
+        condition: service_healthy
+      seat-availability-service:
+        condition: service_healthy
+      customer-service:
+        condition: service_healthy
+      payment-service:
+        condition: service_healthy
+      notification-service:
+        condition: service_healthy
+      ticket-booking-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8080/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    networks:
+      - app-network
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    depends_on:
+      gateway:
+        condition: service_healthy
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  mysql-data:

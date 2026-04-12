@@ -1,0 +1,40 @@
+server:
+  port: 5000
+
+spring:
+  application:
+    name: ticket-booking-service
+  threads:
+    virtual:
+      enabled: true
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:booking_db}?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
+    username: ${DB_USER:root}
+    password: ${DB_PASSWORD:root}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+
+clients:
+  seat:
+    base-url: http://${SEAT_SERVICE_HOST:seat-availability-service}:5000
+  customer:
+    base-url: http://${CUSTOMER_SERVICE_HOST:customer-service}:5000
+  payment:
+    base-url: http://${PAYMENT_SERVICE_HOST:payment-service}:5000
+  notification:
+    base-url: http://${NOTIFICATION_SERVICE_HOST:notification-service}:5000
+  movie:
+    base-url: http://${MOVIE_SERVICE_HOST:movie-service}:5000
+
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+logging:
+  level:
+    com.cinema.booking: DEBUG

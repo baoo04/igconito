@@ -1,0 +1,19 @@
+openapi: 3.0.3
+info:
+  title: Notification Service API
+  version: 1.0.0
+servers:
+  - url: http://localhost:5006
+paths:
+  /health:
+    get:
+      summary: Health
+      responses: { '200': { description: OK } }
+  /notifications/booking-confirmations:
+    post:
+      summary: Send booking confirmation (mock email)
+      responses: { '202': { description: Accepted } }
+  /notifications/{notificationId}:
+    get:
+      summary: Notification status
+      responses: { '200': { description: OK }, '404': { description: Not found } }

@@ -1,0 +1,102 @@
+openapi: 3.0.3
+info:
+  title: Seat Availability Service API
+  version: 1.0.0
+  description: |
+    Seat map, availability check, and holds (TTL default 5 minutes).
+    Hold responses use `expiresAt` as RFC-3339 instant (UTC, e.g. ends with Z) so clients do not mis-parse wall-clock times across time zones.
+
+servers:
+  - url: http://localhost:5002
+    description: Direct service (default compose host port)
+  - url: http://localhost:8080
+    description: Via API gateway (same paths)
+
+paths:
+  /health:
+    get:
+      summary: Health check
+      responses:
+        '200':
+          description: OK
+
+  /showtimes/{showtimeId}/seats:
+    get:
+      summary: Seat map for a showtime
+      parameters:
+        - name: showtimeId
+          in: path
+          required: true
+          schema: { type: integer, format: int64 }
+      responses:
+        '200': { description: OK }
+        '404': { description: Showtime not found in movie-service }
+
+  /showtimes/{showtimeId}/availability:
+    post:
+      summary: Verify all listed seats are FREE
+      parameters:
+        - name: showtimeId
+          in: path
+          required: true
+          schema: { type: integer, format: int64 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [seatIds]
+              properties:
+                seatIds:
+                  type: array
+                  items: { type: integer, format: int64 }
+      responses:
+        '200': { description: All seats available }
+        '409': { description: Seat conflict }
+
+  /holds:
+    post:
+      summary: Create hold
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [showtimeId, seatIds]
+              properties:
+                showtimeId: { type: integer, format: int64 }
+                seatIds:
+                  type: array
+                  items: { type: integer, format: int64 }
+      responses:
+        '201': { description: Created }
+        '409': { description: Seat conflict }
+
+  /holds/{holdId}:
+    get:
+      summary: Get hold
+      parameters:
+        - name: holdId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: OK }
+        '404': { description: Not found }
+
+  /holds/{holdId}/release:
+    post:
+      summary: Release hold (seats back to FREE)
+      responses:
+        '200': { description: OK }
+        '404': { description: Not found }
+        '409': { description: Invalid state }
+
+  /holds/{holdId}/confirm:
+    post:
+      summary: Confirm hold (seats BOOKED)
+      responses:
+        '200': { description: OK }
+        '404': { description: Not found }
+        '409': { description: Invalid state or expired }

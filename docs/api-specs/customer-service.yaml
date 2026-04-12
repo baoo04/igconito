@@ -1,0 +1,30 @@
+openapi: 3.0.3
+info:
+  title: Customer Service API
+  version: 1.0.0
+servers:
+  - url: http://localhost:5003
+paths:
+  /health:
+    get:
+      summary: Health
+      responses: { '200': { description: OK } }
+  /customers:
+    post:
+      summary: Upsert by email
+      responses: { '200': { description: Updated }, '201': { description: Created } }
+  /customers/lookup:
+    get:
+      summary: Lookup by email or phone
+      parameters:
+        - in: query
+          name: email
+          schema: { type: string }
+        - in: query
+          name: phone
+          schema: { type: string }
+      responses: { '200': { description: OK }, '404': { description: Not found } }
+  /customers/validate:
+    post:
+      summary: Validate for booking
+      responses: { '200': { description: OK }, '400': { description: Invalid } }

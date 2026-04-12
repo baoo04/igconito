@@ -1,0 +1,23 @@
+openapi: 3.0.3
+info:
+  title: Payment Service API
+  version: 1.0.0
+servers:
+  - url: http://localhost:5004
+paths:
+  /health:
+    get:
+      summary: Health
+      responses: { '200': { description: OK } }
+  /payments:
+    post:
+      summary: Process payment (mock gateway)
+      responses: { '201': { description: Success }, '402': { description: Declined } }
+  /payments/{paymentId}:
+    get:
+      summary: Get payment
+      responses: { '200': { description: OK }, '404': { description: Not found } }
+  /payments/{paymentId}/confirm:
+    post:
+      summary: Manual confirm (PENDING only)
+      responses: { '200': { description: OK }, '409': { description: Conflict } }

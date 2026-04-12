@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <title>Cinema — Đặt vé & quản trị</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="css/styles.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <div class="brand">Cinema <span>Microservices</span></div>
+      <nav class="nav-tabs" id="main-nav">
+        <button type="button" data-view="booking" class="active">Đặt vé</button>
+        <button type="button" data-view="catalog">Phim &amp; suất chiếu</button>
+        <button type="button" data-view="customers">Khách hàng</button>
+        <button type="button" data-view="payments">Thanh toán</button>
+        <button type="button" data-view="notifications">Thông báo</button>
+        <button type="button" data-view="holds">Giữ chỗ</button>
+      </nav>
+      <div class="api-config">
+        <label>
+          API base (mặc định: /api qua nginx)
+          <input type="text" id="api-base-input" placeholder="http://localhost:3000/api" />
+        </label>
+        <button type="button" class="btn btn-secondary" id="api-save-btn">Lưu</button>
+      </div>
+    </header>
+
+    <main>
+      <div id="global-flash" class="flash hidden" role="status"></div>
+
+      <!-- Đặt vé -->
+      <section id="view-booking">
+        <div id="checkout-success-panel" class="checkout-success hidden" role="status" aria-live="polite">
+          <div class="checkout-success__icon" aria-hidden="true">✓</div>
+          <div class="checkout-success__body">
+            <h3 class="checkout-success__title">Đặt vé thành công</h3>
+            <p class="checkout-success__lead">
+              Mã đặt chỗ: <strong id="success-booking-code">—</strong> · Phim: <strong id="success-movie-title">—</strong>
+            </p>
+            <p class="checkout-success__meta">Tổng tiền: <strong id="success-total">—</strong></p>
+            <p id="success-email-line" class="checkout-success__meta hint"></p>
+            <p id="success-seats-line" class="checkout-success__meta"></p>
+            <p class="hint" style="margin-top: 0.75rem">
+              Backend đã gọi notification-service để gửi xác nhận (mock). Nếu đã bật quyền thông báo trình duyệt, bạn cũng sẽ thấy popup hệ thống.
+            </p>
+            <div class="checkout-success__actions">
+              <button type="button" class="btn btn-secondary" id="btn-checkout-success-close">Đóng</button>
+              <button type="button" class="btn btn-ghost" id="btn-request-notification-perm">
+                Cho phép thông báo trình duyệt
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h2>Luồng đặt vé (orchestrated qua ticket-booking-service)</h2>
+          <p class="hint">
+            Chọn phim → suất chiếu → ghế trống → tạo hold → nhập thông tin khách hàng (đúng quy tắc validate) → thanh toán.
+            Tổng tiền phải khớp tổng giá ghế đang giữ. Thẻ kết thúc <strong>0000</strong> bị từ chối (mock). Có ~10% từ chối ngẫu
+            nhiên — thử lại nếu cần.
+          </p>
+          <div class="steps" id="booking-steps"></div>
+
+          <div id="book-step-1">
+            <h3>1. Chọn phim</h3>
+            <div class="form-row">
+              <button type="button" class="btn btn-secondary" id="btn-reload-movies">Tải lại danh sách</button>
+            </div>
+            <div class="movie-grid" id="movie-pick-grid"></div>
+          </div>
+
+          <div id="book-step-2" class="hidden">
+            <h3>2. Chọn suất chiếu</h3>
+            <p id="book-movie-title" class="hint"></p>
+            <div class="showtime-list" id="showtime-pick-list"></div>
+            <button type="button" class="btn btn-ghost" id="btn-back-movies">← Chọn phim khác</button>
+          </div>
+
+          <div id="book-step-3" class="hidden">
+            <h3>3. Chọn ghế &amp; giữ chỗ</h3>
+            <p class="hint">
+              Sau khi bấm «Tạo hold», ghế được giữ trong khoảng thời gian do server quy định (mặc định thường là
+              <strong>5 phút</strong>; xem đồng hồ ở bước thanh toán).
+            </p>
+            <p id="book-showtime-detail" class="hint"></p>
+            <div class="screen">Màn hình</div>
+            <div class="seat-map-wrap">
+              <div class="seat-map" id="seat-map-root"></div>
+            </div>
+            <p id="seat-selection-summary" class="hint"></p>
+            <div class="form-row">
+              <button type="button" class="btn" id="btn-check-availability" disabled>Kiểm tra còn trống (POST availability)</button>
+              <button type="button" class="btn" id="btn-create-hold" disabled>Tạo hold</button>
+            </div>
+            <pre class="json-out hidden" id="hold-result"></pre>
+          </div>
+
+          <div id="book-step-4" class="hidden">
+            <h3>4. Thanh toán &amp; xác nhận</h3>
+            <div id="hold-checkout-banner" class="hold-banner hidden" role="status" aria-live="polite"></div>
+            <p class="hint">
+              Họ tên: ít nhất hai từ, chữ cái/khoảng trắng. SĐT: 10–11 số bắt đầu 0. Email chuẩn.
+            </p>
+            <div class="grid-2">
+              <label> Họ và tên <input type="text" id="co-name" autocomplete="name" /> </label>
+              <label> Email <input type="email" id="co-email" autocomplete="email" /> </label>
+              <label> Điện thoại <input type="tel" id="co-phone" autocomplete="tel" /> </label>
+              <label>
+                Phương thức
+                <select id="co-pay-method">
+                  <option value="CREDIT_CARD">CREDIT_CARD</option>
+                  <option value="DEBIT_CARD">DEBIT_CARD</option>
+                  <option value="MOCK">MOCK</option>
+                  <option value="BANK_TRANSFER">BANK_TRANSFER</option>
+                </select>
+              </label>
+              <label> Số thẻ (tuỳ chọn) <input type="text" id="co-card" placeholder="Không kết thúc 0000 nếu muốn thành công" /> </label>
+              <label> Chủ thẻ <input type="text" id="co-cardholder" /> </label>
+              <label> Tổng tiền (VND) <input type="text" id="co-total" readonly /> </label>
+            </div>
+            <div class="form-row">
+              <button type="button" class="btn" id="btn-validate-customer">Validate khách (POST /customers/validate)</button>
+              <button type="button" class="btn" id="btn-checkout">Checkout (POST /bookings/checkout)</button>
+            </div>
+            <p class="hint">Header tuỳ chọn: <code>X-Idempotency-Key</code> — tự sinh UUID mỗi lần checkout.</p>
+            <pre class="json-out hidden" id="checkout-result"></pre>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h2>Sau khi đặt — tra cứu / huỷ</h2>
+          <div class="form-row">
+            <label> Booking ID (UUID) <input type="text" id="lookup-booking-id" placeholder="dùng bookingId từ kết quả" /> </label>
+            <button type="button" class="btn btn-secondary" id="btn-get-booking">GET /bookings/{id}</button>
+            <button type="button" class="btn btn-secondary" id="btn-get-tickets">GET /bookings/{id}/tickets</button>
+            <button type="button" class="btn btn-secondary" id="btn-cancel-booking">POST /bookings/{id}/cancel</button>
+          </div>
+          <pre class="json-out hidden" id="booking-read-result"></pre>
+        </div>
+      </section>
+
+      <!-- Catalog -->
+      <section id="view-catalog" class="hidden">
+        <div class="panel">
+          <h2>Danh sách phim</h2>
+          <div class="form-row">
+            <label> Trạng thái <select id="movie-filter-status"> <option value="">Tất cả</option> <option value="ACTIVE" selected>ACTIVE</option> <option value="INACTIVE">INACTIVE</option> </select> </label>
+            <label> Thể loại <input type="text" id="movie-filter-genre" placeholder="optional" /> </label>
+            <button type="button" class="btn" id="btn-list-movies-admin">GET /movies</button>
+          </div>
+          <div id="movie-list-admin"></div>
+        </div>
+
+        <div class="panel">
+          <h2>Tạo / sửa phim</h2>
+          <div class="grid-2">
+            <label> ID (khi sửa) <input type="number" id="movie-edit-id" placeholder="để trống khi tạo mới" /> </label>
+            <label> Tiêu đề * <input type="text" id="movie-title" /> </label>
+            <label> Mô tả <textarea id="movie-desc"></textarea> </label>
+            <label> Thể loại <input type="text" id="movie-genre" /> </label>
+            <label> Thời lượng (phút) <input type="number" id="movie-duration" min="1" /> </label>
+            <label> Điểm <input type="number" id="movie-rating" step="0.1" /> </label>
+            <label> Poster URL <input type="text" id="movie-poster" /> </label>
+            <label> Ngày phát hành <input type="date" id="movie-release" /> </label>
+            <label> Trạng thái (khi sửa) <select id="movie-status"> <option value="">—</option> <option value="ACTIVE">ACTIVE</option> <option value="INACTIVE">INACTIVE</option> </select> </label>
+          </div>
+          <div class="form-row">
+            <button type="button" class="btn" id="btn-movie-create">POST /movies</button>
+            <button type="button" class="btn btn-secondary" id="btn-movie-update">PUT /movies/{id}</button>
+            <button type="button" class="btn btn-secondary" id="btn-movie-delete">DELETE /movies/{id}</button>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h2>Rạp</h2>
+          <div class="form-row">
+            <button type="button" class="btn btn-secondary" id="btn-list-cinemas">GET /cinemas</button>
+          </div>
+          <div id="cinema-list-out"></div>
+          <h3>Tạo rạp</h3>
+          <div class="grid-2">
+            <label> Tên * <input type="text" id="cinema-name" /> </label>
+            <label> Địa chỉ <input type="text" id="cinema-address" /> </label>
+            <label> Thành phố <input type="text" id="cinema-city" /> </label>
+            <label> Điện thoại <input type="text" id="cinema-phone" /> </label>
+          </div>
+          <button type="button" class="btn" id="btn-cinema-create">POST /cinemas</button>
+        </div>
+
+        <div class="panel">
+          <h2>Suất chiếu</h2>
+          <div class="form-row">
+            <label> Ngày <input type="date" id="st-filter-date" /> </label>
+            <label> Cinema ID <input type="number" id="st-filter-cinema" placeholder="optional" /> </label>
+            <button type="button" class="btn btn-secondary" id="btn-list-showtimes">GET /showtimes</button>
+          </div>
+          <div id="showtime-list-out"></div>
+          <h3>Tạo suất chiếu</h3>
+          <p class="hint">Cần <code>auditoriumId</code> có trong DB (từ seed hoặc từ suất hiện có). Lấy từ cột Auditorium trong bảng dưới hoặc nhập tay.</p>
+          <div class="grid-2">
+            <label> Movie ID * <input type="number" id="st-movie-id" /> </label>
+            <label> Auditorium ID * <input type="number" id="st-aud-id" /> </label>
+            <label> Bắt đầu <input type="datetime-local" id="st-start" /> </label>
+            <label> Kết thúc <input type="datetime-local" id="st-end" /> </label>
+            <label> Giá cơ bản (VND) <input type="number" id="st-price" step="0.01" /> </label>
+          </div>
+          <div class="form-row">
+            <button type="button" class="btn" id="btn-showtime-create">POST /showtimes</button>
+          </div>
+          <h3>Cập nhật / xoá suất</h3>
+          <div class="form-row">
+            <label> Showtime ID <input type="number" id="st-edit-id" /> </label>
+            <button type="button" class="btn btn-secondary" id="btn-showtime-get">GET /showtimes/{id}</button>
+            <button type="button" class="btn btn-secondary" id="btn-showtime-update">PUT /showtimes/{id}</button>
+            <button type="button" class="btn btn-secondary" id="btn-showtime-delete">DELETE /showtimes/{id}</button>
+          </div>
+          <pre class="json-out hidden" id="showtime-crud-result"></pre>
+        </div>
+      </section>
+
+      <!-- Customers -->
+      <section id="view-customers" class="hidden">
+        <div class="panel">
+          <h2>Khách hàng (customer-service)</h2>
+          <h3>Upsert theo email — POST /customers</h3>
+          <div class="grid-2">
+            <label> Họ tên <input type="text" id="cu-name" /> </label>
+            <label> Email <input type="email" id="cu-email" /> </label>
+            <label> Điện thoại <input type="tel" id="cu-phone" /> </label>
+          </div>
+          <button type="button" class="btn" id="btn-customer-upsert">Gửi</button>
+          <h3>Tra cứu — GET /customers/lookup</h3>
+          <div class="form-row">
+            <label> Email <input type="email" id="cu-lookup-email" /> </label>
+            <label> Hoặc SĐT <input type="tel" id="cu-lookup-phone" /> </label>
+            <button type="button" class="btn btn-secondary" id="btn-customer-lookup">Tra cứu</button>
+          </div>
+          <h3>Validate (giống booking) — POST /customers/validate</h3>
+          <div class="grid-2">
+            <label> Họ tên <input type="text" id="cv-name" /> </label>
+            <label> Email <input type="email" id="cv-email" /> </label>
+            <label> Điện thoại <input type="tel" id="cv-phone" /> </label>
+          </div>
+          <button type="button" class="btn btn-secondary" id="btn-customer-validate">Validate</button>
+          <pre class="json-out hidden" id="customer-result"></pre>
+        </div>
+      </section>
+
+      <!-- Payments -->
+      <section id="view-payments" class="hidden">
+        <div class="panel">
+          <h2>Thanh toán trực tiếp (payment-service)</h2>
+          <p class="hint">POST /payments — tham chiếu booking bất kỳ (chuỗi). MOCK / thẻ không 0000.</p>
+          <div class="grid-2">
+            <label> Mã tham chiếu * <input type="text" id="pay-ref" value="DEMO-REF-001" /> </label>
+            <label> Số tiền * <input type="number" id="pay-amount" value="100000" step="0.01" /> </label>
+            <label> Tiền tệ <input type="text" id="pay-currency" value="VND" /> </label>
+            <label> Phương thức * <select id="pay-method"> <option value="MOCK">MOCK</option> <option value="CREDIT_CARD">CREDIT_CARD</option> </select> </label>
+            <label> Số thẻ <input type="text" id="pay-card" /> </label>
+            <label> Chủ thẻ * <input type="text" id="pay-holder" value="Nguyen Van A" /> </label>
+          </div>
+          <div class="form-row">
+            <button type="button" class="btn" id="btn-pay-create">POST /payments</button>
+            <label> Payment ID <input type="text" id="pay-id-lookup" /> </label>
+            <button type="button" class="btn btn-secondary" id="btn-pay-get">GET /payments/{id}</button>
+            <button type="button" class="btn btn-secondary" id="btn-pay-confirm">POST /payments/{id}/confirm</button>
+          </div>
+          <pre class="json-out hidden" id="payment-result"></pre>
+        </div>
+      </section>
+
+      <!-- Notifications -->
+      <section id="view-notifications" class="hidden">
+        <div class="panel">
+          <h2>Thông báo (notification-service)</h2>
+          <p class="hint">POST /notifications/booking-confirmations — gửi email giả lập. Có thể điền tay hoặc dùng nút “Lấy từ booking cuối” (session).</p>
+          <div class="form-row">
+            <button type="button" class="btn btn-secondary" id="btn-notif-prefill">Lấy từ kết quả checkout gần nhất</button>
+          </div>
+          <div class="grid-2">
+            <label> bookingId (UUID) <input type="text" id="nf-booking-id" /> </label>
+            <label> bookingCode <input type="text" id="nf-booking-code" /> </label>
+            <label> recipientEmail <input type="email" id="nf-email" /> </label>
+            <label> customerName <input type="text" id="nf-cust-name" /> </label>
+            <label> movieTitle <input type="text" id="nf-movie" /> </label>
+            <label> cinemaName <input type="text" id="nf-cinema" /> </label>
+            <label> auditoriumName <input type="text" id="nf-hall" /> </label>
+            <label> startTime (ISO local) <input type="text" id="nf-start" placeholder="2026-04-11T19:00:00" /> </label>
+            <label> totalAmount <input type="number" id="nf-total" step="0.01" /> </label>
+          </div>
+          <label> Tickets JSON (mảng { ticketCode, seatCode, seatType, price }) <textarea id="nf-tickets-json">[]</textarea> </label>
+          <div class="form-row">
+            <button type="button" class="btn" id="btn-notif-send">POST /notifications/booking-confirmations</button>
+            <label> notificationId <input type="text" id="nf-id-get" /> </label>
+            <button type="button" class="btn btn-secondary" id="btn-notif-get">GET /notifications/{id}</button>
+          </div>
+          <pre class="json-out hidden" id="notif-result"></pre>
+        </div>
+      </section>
+
+      <!-- Holds -->
+      <section id="view-holds" class="hidden">
+        <div class="panel">
+          <h2>Giữ chỗ (seat-availability-service)</h2>
+          <div class="form-row">
+            <label> holdId (UUID) <input type="text" id="hold-lookup-id" /> </label>
+            <button type="button" class="btn btn-secondary" id="btn-hold-get">GET /holds/{id}</button>
+            <button type="button" class="btn btn-secondary" id="btn-hold-release">POST /holds/{id}/release</button>
+            <button type="button" class="btn btn-secondary" id="btn-hold-confirm">POST /holds/{id}/confirm</button>
+          </div>
+          <p class="hint">Thường hold được xác nhận tự động sau checkout; release/confirm thủ công dùng để thử nghiệm API.</p>
+          <pre class="json-out hidden" id="hold-manual-result"></pre>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="js/app.js"></script>
+  </body>
+</html>
