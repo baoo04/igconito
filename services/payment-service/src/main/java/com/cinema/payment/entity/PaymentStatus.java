@@ -1,8 +1,8 @@
 package com.cinema.payment.entity;
 
 public enum PaymentStatus {
-  PENDING,
-  SUCCESS,
-  FAILED,
-  REFUNDED
+    PENDING,
+    SUCCESS,
+    FAILED,
+    REFUNDED
 }

@@ -12,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
+import org.springframework.util.DigestUtils;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 
@@ -82,10 +83,12 @@ public class DownstreamClients {
 
   public PaymentResponseDto createPayment(ObjectNode body) throws IOException {
     try {
+      String idempotencyKey = DigestUtils.md5DigestAsHex(body.toString().getBytes());
       String json =
           paymentRestClient
               .post()
               .uri("/payments")
+              .header("Idempotency-Key", idempotencyKey)
               .contentType(MediaType.APPLICATION_JSON)
               .body(body.toString())
               .retrieve()

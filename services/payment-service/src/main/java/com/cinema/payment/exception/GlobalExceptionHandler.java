@@ -1,6 +1,6 @@
 package com.cinema.payment.exception;
 
-import com.cinema.payment.dto.ErrorResponse;
+import com.cinema.payment.dto.response.ApiResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -9,25 +9,25 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-  @ExceptionHandler(ResourceNotFoundException.class)
-  public ResponseEntity<ErrorResponse> notFound(ResourceNotFoundException ex) {
-    return ResponseEntity.status(HttpStatus.NOT_FOUND)
-        .body(
-            ErrorResponse.builder()
-                .error("NOT_FOUND")
-                .message(ex.getMessage())
-                .status(404)
-                .build());
-  }
+    @ExceptionHandler(AppException.class)
+    public ResponseEntity<ApiResponse<?>> handleAppException(AppException ex) {
+        ErrorCode error = ex.getErrorCode();
 
-  @ExceptionHandler(IllegalStateException.class)
-  public ResponseEntity<ErrorResponse> conflict(IllegalStateException ex) {
-    return ResponseEntity.status(HttpStatus.CONFLICT)
-        .body(
-            ErrorResponse.builder()
-                .error("CONFLICT")
-                .message(ex.getMessage())
-                .status(409)
-                .build());
-  }
+        return ResponseEntity
+            .status(error.getStatusCode())
+            .body(ApiResponse.error(error));
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ApiResponse<?>> handleOtherException(Exception ex) {
+        return ResponseEntity
+            .status(HttpStatus.INTERNAL_SERVER_ERROR)
+            .body(
+                ApiResponse.<Void>builder()
+                    .message("Internal server error")
+                    .status(500)
+                    .error("INTERNAL_ERROR")
+                    .build()
+            );
+    }
 }
